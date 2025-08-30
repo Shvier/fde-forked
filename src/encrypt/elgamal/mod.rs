@@ -10,6 +10,7 @@ use ark_std::marker::PhantomData;
 use ark_std::ops::{Add, Mul};
 use ark_std::rand::Rng;
 use ark_std::{One, UniformRand, Zero};
+use ark_serialize::{CanonicalSerialize, CanonicalDeserialize};
 
 pub const MAX_BITS: usize = 32;
 
@@ -20,7 +21,7 @@ pub struct ExponentialElgamal<C>(pub PhantomData<C>);
 /// It contains `c1 = g^y` and `c2 = g^m * h^y` where `g` is a group generator, `h = g^x` is the
 /// public encryption key computed from the secret `x` key, `y` is some random scalar and `m` is
 /// the message to be encrypted.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, CanonicalSerialize, CanonicalDeserialize)]
 pub struct Cipher<C: CurveGroup>([C::Affine; 2]);
 
 impl<C: CurveGroup> Default for Cipher<C> {

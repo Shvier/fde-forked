@@ -10,17 +10,22 @@
 mod poly;
 mod utils;
 
+use std::io::Read;
+
 use crate::commit::kzg::{Kzg, Powers};
 use crate::hash::Hasher;
 use crate::Error as CrateError;
 use ark_ec::pairing::Pairing;
 use ark_ec::{AffineRepr, CurveGroup};
+use ark_ff::PrimeField;
 use ark_poly::{EvaluationDomain, GeneralEvaluationDomain, Polynomial};
 use ark_std::marker::PhantomData;
 use ark_std::rand::Rng;
 use ark_std::UniformRand;
 use digest::Digest;
 use thiserror::Error as ErrorT;
+
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Compress, SerializationError, Validate, Valid};
 
 #[derive(ErrorT, Debug, PartialEq)]
 pub enum Error {
@@ -36,32 +41,52 @@ pub enum Error {
 
 const PROOF_DOMAIN_SEP: &[u8] = b"fde range proof";
 
-#[derive(Clone, Copy, Debug)]
-pub struct Evaluations<S> {
+#[derive(Clone, Copy, Debug, CanonicalSerialize, CanonicalDeserialize)]
+pub struct Evaluations<S: PrimeField> {
     pub g: S,
     pub g_omega: S,
     pub w_cap: S,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, CanonicalSerialize, CanonicalDeserialize)]
 pub struct Commitments<C: Pairing> {
     pub f: C::G1Affine,
     pub g: C::G1Affine,
     pub q: C::G1Affine,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, CanonicalSerialize, CanonicalDeserialize)]
 pub struct Proofs<C: Pairing> {
     pub aggregate: C::G1Affine,
     pub shifted: C::G1Affine,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, CanonicalSerialize)]
 pub struct RangeProof<C: Pairing, D> {
     pub evaluations: Evaluations<C::ScalarField>,
     pub commitments: Commitments<C>,
     pub proofs: Proofs<C>,
     _digest: PhantomData<D>,
+}
+
+impl<C: Pairing, D: Digest + Sync> CanonicalDeserialize for RangeProof<C, D> {
+    // We only have to implement the `deserialize_with_mode` method; the other methods 
+    // have default implementations that call the latter.
+    fn deserialize_with_mode<R: Read>(mut reader: R, compress: Compress, validate: Validate) -> Result<Self, SerializationError> {
+        let evaluations = Evaluations::deserialize_with_mode(&mut reader, compress, validate)?;
+        let commitments = Commitments::deserialize_with_mode(&mut reader, compress, validate)?;
+        let proofs = Proofs::deserialize_with_mode(&mut reader, compress, validate)?;
+        Ok(Self { evaluations, commitments, proofs, _digest: PhantomData })
+    }
+}
+
+impl<C: Pairing, D: Digest + Sync> Valid for RangeProof<C, D> {
+    fn check(&self) -> Result<(), SerializationError> {
+        self.evaluations.check()?;
+        self.commitments.check()?;
+        self.proofs.check()?;
+        Ok(())
+    }
 }
 
 impl<C: Pairing, D: Digest> RangeProof<C, D> {

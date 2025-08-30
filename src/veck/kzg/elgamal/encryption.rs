@@ -8,10 +8,11 @@ use ark_std::rand::Rng;
 use digest::Digest;
 #[cfg(feature = "parallel")]
 use rayon::prelude::*;
+use ark_serialize::{CanonicalSerialize, CanonicalDeserialize};
 
 /// A publicly verifiable proof based on the Elgamal encryption scheme.
-#[derive(Clone)]
-pub struct EncryptionProof<const N: usize, C: Pairing, D: Clone + Digest> {
+#[derive(Clone, CanonicalSerialize, CanonicalDeserialize)]
+pub struct EncryptionProof<const N: usize, C: Pairing, D: Clone + Digest + Sync> {
     /// The actual Elgamal ciphertexts of the encrypted data points.
     pub ciphers: Vec<Cipher<C::G1>>,
     /// Each ciphertext is split into a set of scalars that, once decrypted, can reconstruct the
@@ -27,7 +28,7 @@ pub struct EncryptionProof<const N: usize, C: Pairing, D: Clone + Digest> {
     pub random_encryption_points: Vec<C::G1Affine>,
 }
 
-impl<const N: usize, C: Pairing, D: Clone + Digest> Default for EncryptionProof<N, C, D> {
+impl<const N: usize, C: Pairing, D: Clone + Digest + Sync> Default for EncryptionProof<N, C, D> {
     fn default() -> Self {
         Self {
             ciphers: Vec::new(),
@@ -151,6 +152,24 @@ impl<const N: usize, C: Pairing, D: Clone + Digest + Send + Sync> EncryptionProo
         #[cfg(feature = "parallel")]
         let result = self
             .range_proofs
+            .par_iter()
+            .fold(
+                || true,
+                |acc, rps| acc && rps.par_iter().all(|rp| rp.verify(MAX_BITS, powers).is_ok()),
+            )
+            .reduce(|| true, |acc: bool, sub_boolean: bool| acc && sub_boolean);
+
+        #[cfg(not(feature = "parallel"))]
+        let result = self.range_proofs.iter().fold(true, |acc, rps| {
+            acc && rps.par_iter.all(|rp| rp.verify(MAX_BITS, powers)).is_ok()
+        });
+        result
+    }
+
+    pub fn verify_partial_range_proofs(&self, powers: &Powers<C>, subindices: &Vec<usize>) -> bool {
+        #[cfg(feature = "parallel")]
+        let range_proofs = subindices.iter().map(|&i| &self.range_proofs[i]).collect::<Vec<_>>();
+        let result = range_proofs
             .par_iter()
             .fold(
                 || true,
