@@ -62,6 +62,21 @@ impl<const N: usize, C: Pairing, D: Clone + Digest + Send + Sync> EncryptionProo
         proof
     }
 
+    pub fn generate_range_proof(
+        &mut self,
+        evaluations: &[C::ScalarField],
+        powers: &Powers<C>,
+        rng: &mut impl Rng,
+    ) {
+        for eval in evaluations {
+            let split_eval = SplitScalar::from(*eval);
+            let rp = split_eval
+                .splits()
+                .map(|s| RangeProof::new(s, MAX_BITS, powers, rng).expect("invalid range proof input"));
+            self.range_proofs.push(rp);
+        }
+    }
+
     fn append<R: Rng>(
         mut self,
         eval: &C::ScalarField,
@@ -70,9 +85,9 @@ impl<const N: usize, C: Pairing, D: Clone + Digest + Send + Sync> EncryptionProo
         rng: &mut R,
     ) -> Self {
         let split_eval = SplitScalar::from(*eval);
-        let rp = split_eval
-            .splits()
-            .map(|s| RangeProof::new(s, MAX_BITS, powers, rng).expect("invalid range proof input"));
+        // let rp = split_eval
+        //     .splits()
+        //     .map(|s| RangeProof::new(s, MAX_BITS, powers, rng).expect("invalid range proof input"));
         let (sc, rand) = split_eval.encrypt::<Elgamal<C::G1>, _>(encryption_pk, rng);
         let cipher = <Elgamal<C::G1> as EncryptionEngine>::encrypt_with_randomness(
             eval,
@@ -83,7 +98,7 @@ impl<const N: usize, C: Pairing, D: Clone + Digest + Send + Sync> EncryptionProo
             .push((C::G1Affine::generator() * rand).into_affine());
         self.ciphers.push(cipher);
         self.short_ciphers.push(sc);
-        self.range_proofs.push(rp);
+        // self.range_proofs.push(rp);
         self
     }
 
@@ -92,7 +107,7 @@ impl<const N: usize, C: Pairing, D: Clone + Digest + Send + Sync> EncryptionProo
             .extend(other.random_encryption_points);
         self.ciphers.extend(other.ciphers);
         self.short_ciphers.extend(other.short_ciphers);
-        self.range_proofs.extend(other.range_proofs);
+        // self.range_proofs.extend(other.range_proofs);
         self
     }
 
@@ -110,7 +125,7 @@ impl<const N: usize, C: Pairing, D: Clone + Digest + Send + Sync> EncryptionProo
             ciphers.push(self.ciphers[index]);
             short_ciphers.push(self.short_ciphers[index]);
             random_encryption_points.push(self.random_encryption_points[index]);
-            range_proofs.push(self.range_proofs[index].clone());
+            // range_proofs.push(self.range_proofs[index].clone());
         }
 
         Self {
