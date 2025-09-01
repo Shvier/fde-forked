@@ -102,7 +102,7 @@ impl<const N: usize, C: Pairing, D: Clone + Digest + Send + Sync> EncryptionProo
         self
     }
 
-    fn extend(mut self, other: Self) -> Self {
+    pub fn extend(mut self, other: Self) -> Self {
         self.random_encryption_points
             .extend(other.random_encryption_points);
         self.ciphers.extend(other.ciphers);
