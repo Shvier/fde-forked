@@ -7,7 +7,7 @@ use crate::hash::Hasher;
 use crate::Error as CrateError;
 use ark_ec::pairing::Pairing;
 use ark_ec::{AffineRepr, CurveGroup, VariableBaseMSM as Msm};
-use ark_ff::PrimeField;
+use ark_ff::{PrimeField, Zero};
 use ark_poly::domain::general::GeneralEvaluationDomain;
 use ark_poly::univariate::DensePolynomial;
 use ark_poly::EvaluationDomain;
